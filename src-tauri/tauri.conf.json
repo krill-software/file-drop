@@ -1,0 +1,61 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "File Drop",
+  "version": "0.1.0",
+  "identifier": "software.krill.file-drop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "File Drop",
+        "width": 900,
+        "height": 720,
+        "minWidth": 560,
+        "minHeight": 480,
+        "decorations": false,
+        "resizable": true,
+        "center": true,
+        "backgroundColor": "#FAFAFF"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg3Nzg5QTc4MEExOTM4MjIKUldRaU9Ca0tlSnA0aDQzcXJLRWtKWTI0K0lDM3IwTW4wcGUzdFZ5RE01ckYraU5nL1FRZWRXRmgK",
+      "endpoints": [
+        "https://github.com/krill-software/file-drop/releases/latest/download/latest.json"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png"
+    ],
+    "category": "Network",
+    "shortDescription": "Drop a file to a friend",
+    "longDescription": "Pair with a friend once via ticket or QR; after that, click their card to drop a file. End-to-end encrypted, peer-to-peer, no accounts.",
+    "linux": {
+      "deb": {
+        "section": "net",
+        "priority": "optional",
+        "desktopTemplate": "main.desktop"
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  }
+}
