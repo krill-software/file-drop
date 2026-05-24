@@ -1,60 +1,551 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>File Drop — krill-software</title>
+    <title>File Drop — peer-to-peer file transfer for Linux</title>
+    <meta
+      name="description"
+      content="Pair with a friend via a shared code, then drop a file. End-to-end encrypted, peer-to-peer over iroh QUIC, no accounts."
+    />
+    <meta property="og:title" content="File Drop — peer-to-peer file transfer for Linux" />
+    <meta
+      property="og:description"
+      content="Pair once via a code; drop files end-to-end encrypted over QUIC. No accounts, no servers, no inbox."
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
-        --fm-bg: #FAFAFF;
-        --fm-text: #30343F;
-        --fm-muted: #878472;
-        --fm-accent: #DD7596;
-        --fm-rule: rgba(48, 52, 63, 0.08);
+        --bg: #fafaff;
+        --ink: #30343f;
+        --muted: #878472;
+        --accent: #dd7596;
+        --accent-strong: #ff82bf;
+        --rule: rgba(48, 52, 63, 0.08);
+        --rule-strong: rgba(48, 52, 63, 0.18);
+        --mono: "JetBrains Mono", "Source Code Pro", ui-monospace, monospace;
+        --sans: "Inter", system-ui, sans-serif;
+        --serif: "Source Serif 4", Charter, Georgia, serif;
       }
+
       * { box-sizing: border-box; }
-      html, body {
-        margin: 0;
-        height: 100%;
-        background: var(--fm-bg);
-        color: var(--fm-text);
-        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-        font-size: 16px;
-      }
+      html, body { margin: 0; padding: 0; }
       body {
-        display: grid;
-        place-items: center;
-        text-align: center;
-        padding: 32px;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
       }
-      main { max-width: 560px; }
-      h1 { font-size: 28px; font-weight: 600; margin: 0 0 8px; }
-      .tagline { color: var(--fm-muted); margin: 0 0 32px; }
-      .tagline a { border: 0; padding: 0; text-decoration: underline; text-underline-offset: 2px; color: inherit; }
-      .links { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-      .links a {
-        display: inline-block;
-        padding: 10px 18px;
-        border: 1px solid var(--fm-rule);
-        border-radius: 8px;
+      ::selection { background: rgba(221, 117, 150, 0.22); text-shadow: none; }
+
+      a {
+        color: var(--accent);
         text-decoration: none;
-        color: var(--fm-text);
+        border-bottom: 1px solid transparent;
+        transition: border-color 120ms ease, color 120ms ease;
+      }
+      a:hover { color: var(--accent-strong); border-bottom-color: currentColor; }
+
+      .wrap { max-width: 960px; margin: 0 auto; padding: 0 32px; }
+
+      /* Nav */
+      nav.top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 28px 0;
+        font-family: var(--mono);
         font-size: 14px;
       }
-      .links a:hover { border-color: var(--fm-accent); color: var(--fm-accent); }
-      footer { margin-top: 40px; color: var(--fm-muted); font-size: 12px; }
+      nav.top .brand { color: var(--ink); font-weight: 500; letter-spacing: -0.01em; }
+      nav.top .brand::before {
+        content: "";
+        display: inline-block;
+        width: 8px; height: 8px;
+        background: var(--accent);
+        border-radius: 50%;
+        margin-right: 10px;
+        transform: translateY(-1px);
+      }
+      nav.top ul { list-style: none; display: flex; gap: 28px; margin: 0; padding: 0; }
+      nav.top a { color: var(--muted); border: none; }
+      nav.top a:hover { color: var(--ink); }
+
+      /* Hero */
+      .hero { padding: 80px 0 56px; }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin-bottom: 28px;
+      }
+      h1 {
+        font-family: var(--serif);
+        font-weight: 400;
+        font-size: clamp(44px, 7vw, 76px);
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        margin: 0 0 24px;
+        max-width: 18ch;
+      }
+      h1 em { font-style: italic; color: var(--accent); }
+      .lede {
+        font-family: var(--serif);
+        font-size: clamp(19px, 2vw, 22px);
+        line-height: 1.55;
+        color: var(--ink);
+        max-width: 56ch;
+        margin: 0 0 40px;
+        opacity: 0.82;
+      }
+      .cta { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 10px;
+        padding: 14px 22px;
+        font-family: var(--mono); font-size: 14px; font-weight: 500;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        transition: transform 120ms ease, background 120ms ease, border-color 120ms ease, color 120ms ease;
+      }
+      .btn-primary { background: var(--ink); color: var(--bg); }
+      .btn-primary:hover { background: var(--accent); color: var(--bg); transform: translateY(-1px); }
+      .btn-secondary { color: var(--ink); border-color: var(--rule-strong); }
+      .btn-secondary:hover { border-color: var(--ink); color: var(--ink); }
+      .btn .size { color: var(--muted); font-weight: 400; }
+      .btn-primary .size { color: rgba(250, 250, 255, 0.55); }
+      .meta {
+        margin-top: 22px;
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .meta strong { color: var(--ink); font-weight: 500; }
+
+      /* Preview mock — slice of the live app */
+      .preview-frame {
+        margin: 48px 0 0;
+        border: 1px solid var(--rule-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--bg);
+        box-shadow:
+          0 30px 60px -30px rgba(48, 52, 63, 0.18),
+          0 8px 20px -10px rgba(48, 52, 63, 0.08);
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        grid-template-rows: 32px 1fr;
+      }
+      .preview-aux-top {
+        grid-row: 1 / 2; grid-column: 1 / 2;
+        background: rgba(48, 52, 63, 0.03);
+        display: flex; align-items: center;
+        padding: 0 10px;
+        color: var(--muted);
+      }
+      .preview-main-top {
+        grid-row: 1 / 2; grid-column: 2 / 3;
+        display: flex; align-items: center; justify-content: flex-end;
+        gap: 8px;
+        padding: 0 10px;
+        color: var(--muted);
+      }
+      .preview-main-top .dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: var(--rule-strong);
+      }
+      .preview-aux {
+        grid-row: 2 / 3; grid-column: 1 / 2;
+        background: rgba(48, 52, 63, 0.03);
+        padding: 6px 8px 14px;
+        display: flex; flex-direction: column;
+        gap: 2px;
+        font-family: var(--sans);
+        font-size: 12.5px;
+      }
+      .preview-row {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 8px;
+        border-radius: 4px;
+        color: var(--ink);
+      }
+      .preview-row.selected { background: rgba(221, 117, 150, 0.10); }
+      .preview-row .pavatar {
+        width: 22px; height: 22px;
+        border-radius: 50%;
+        background: var(--rule);
+        flex-shrink: 0;
+      }
+      .preview-row .picon {
+        width: 22px; height: 22px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--muted);
+        flex-shrink: 0;
+      }
+      .preview-row .pdot {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        margin-left: auto;
+      }
+      .preview-row.offline .pdot { background: var(--rule-strong); }
+      .preview-sep {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        padding: 14px 8px 4px;
+      }
+      .preview-version {
+        margin-top: auto;
+        text-align: center;
+        font-size: 10.5px;
+        color: var(--muted);
+        font-family: var(--mono);
+        padding-top: 8px;
+      }
+      .preview-main {
+        grid-row: 2 / 3; grid-column: 2 / 3;
+        padding: 18px 24px 24px;
+        display: flex; flex-direction: column; gap: 14px;
+      }
+      .preview-section-title {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .preview-peer {
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px;
+        border: 1px solid var(--rule);
+        border-radius: 6px;
+      }
+      .preview-peer .pavatar { width: 40px; height: 40px; border-radius: 50%; background: var(--rule); flex-shrink: 0; }
+      .preview-peer .name { font-size: 14px; font-weight: 600; }
+      .preview-peer .sub { font-size: 11px; color: var(--accent-strong); }
+      .preview-drop {
+        border: 2px dashed var(--rule-strong);
+        border-radius: 8px;
+        padding: 24px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .preview-drop .top {
+        color: var(--ink); font-weight: 600; margin-bottom: 4px;
+      }
+
+      /* Sections */
+      section { padding: 96px 0; border-top: 1px solid var(--rule); }
+      .section-label {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        margin-bottom: 16px;
+      }
+      h2 {
+        font-family: var(--serif);
+        font-weight: 400;
+        font-size: clamp(32px, 4vw, 44px);
+        line-height: 1.15;
+        letter-spacing: -0.015em;
+        margin: 0 0 48px;
+        max-width: 22ch;
+      }
+
+      /* Features */
+      .features {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 56px 64px;
+      }
+      .feature h3 {
+        font-family: var(--sans);
+        font-size: 17px;
+        font-weight: 600;
+        margin: 0 0 10px;
+        letter-spacing: -0.005em;
+      }
+      .feature p { margin: 0; color: var(--muted); font-size: 16px; line-height: 1.6; }
+      .feature .tag {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--accent);
+        margin-bottom: 10px;
+      }
+
+      /* Principles */
+      .principles { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
+      .principle { border-left: 2px solid var(--accent); padding-left: 20px; }
+      .principle strong { display: block; margin-bottom: 6px; font-weight: 600; }
+      .principle span { color: var(--muted); font-size: 16px; }
+
+      /* Install */
+      .install { display: grid; grid-template-columns: 1.1fr 1fr; gap: 56px; }
+      .install-copy p { color: var(--muted); max-width: 44ch; }
+      .install-box {
+        background: rgba(48, 52, 63, 0.03);
+        border: 1px solid var(--rule);
+        border-radius: 10px;
+        padding: 24px;
+      }
+      .install-box h3 {
+        font-family: var(--mono);
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin: 0 0 14px;
+        font-weight: 500;
+      }
+      .install-box pre {
+        margin: 0 0 22px;
+        font-family: var(--mono);
+        font-size: 13.5px;
+        line-height: 1.7;
+        color: var(--ink);
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .install-box pre .c { color: var(--muted); }
+      .install-box hr { border: none; border-top: 1px solid var(--rule); margin: 22px 0; }
+
+      /* Footer */
+      footer {
+        padding: 48px 0 64px;
+        border-top: 1px solid var(--rule);
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--muted);
+        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+      }
+      footer a { color: var(--muted); border: none; }
+      footer a:hover { color: var(--ink); }
+
+      @media (max-width: 720px) {
+        .wrap { padding: 0 22px; }
+        nav.top ul { gap: 18px; }
+        .hero { padding: 48px 0 32px; }
+        section { padding: 72px 0; }
+        .features, .principles, .install { grid-template-columns: 1fr; gap: 40px; }
+        .preview-frame { grid-template-columns: 160px 1fr; }
+      }
     </style>
   </head>
   <body>
-    <main>
-      <h1>File Drop</h1>
-      <p class="tagline">Pair with a friend via a shared code, then drop a file. End-to-end encrypted, P2P, no accounts. Part of <a href="https://github.com/krill-software">krill-software</a>.</p>
-      <div class="links">
-        <a href="https://github.com/krill-software/file-drop">Source on GitHub</a>
-        <a href="https://github.com/krill-software/file-drop/releases">Releases</a>
-        <a href="https://github.com/krill-software/file-drop/blob/main/README.md">README</a>
-      </div>
-      <footer>MIT licensed · No tracking, no accounts</footer>
-    </main>
+    <div class="wrap">
+      <nav class="top">
+        <div class="brand">krill / file-drop</div>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#install">Install</a></li>
+          <li><a href="https://github.com/krill-software/file-drop">GitHub</a></li>
+        </ul>
+      </nav>
+
+      <header class="hero">
+        <div class="eyebrow">Peer-to-peer file transfer for Linux</div>
+        <h1>Hand a file to a friend <em>anywhere</em>.</h1>
+        <p class="lede">
+          Pair once via a shared code; after that, drop a file onto their
+          card and it goes. End-to-end encrypted over QUIC. No accounts,
+          no inbox, no krill-operated servers.
+        </p>
+        <div class="cta">
+          <a
+            class="btn btn-primary"
+            href="https://github.com/krill-software/file-drop/releases/download/v0.1.0/File%20Drop_0.1.0_amd64.AppImage"
+          >
+            Download AppImage <span class="size">· 77 MB</span>
+          </a>
+          <a
+            class="btn btn-secondary"
+            href="https://github.com/krill-software/file-drop/releases/download/v0.1.0/File%20Drop_0.1.0_amd64.deb"
+          >
+            .deb for Ubuntu / Debian
+          </a>
+        </div>
+        <div class="meta">
+          <strong>v0.1.0</strong> · Linux x86_64 · Free &amp; open source
+        </div>
+
+        <div class="preview-frame">
+          <div class="preview-aux-top">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          </div>
+          <div class="preview-main-top">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          </div>
+          <div class="preview-aux">
+            <div class="preview-row">
+              <div class="pavatar"></div>
+              <span>swift-otter-42</span>
+            </div>
+            <div class="preview-row">
+              <div class="picon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </div>
+              <span>Connect</span>
+            </div>
+            <div class="preview-row">
+              <div class="picon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+              </div>
+              <span>Files</span>
+            </div>
+            <div class="preview-sep">Contacts</div>
+            <div class="preview-row selected">
+              <div class="pavatar"></div>
+              <span>tokyo</span>
+              <span class="pdot"></span>
+            </div>
+            <div class="preview-row offline">
+              <div class="pavatar"></div>
+              <span>mom</span>
+              <span class="pdot"></span>
+            </div>
+            <div class="preview-row offline">
+              <div class="pavatar"></div>
+              <span>work-laptop</span>
+              <span class="pdot"></span>
+            </div>
+            <div class="preview-version">v0.1.0</div>
+          </div>
+          <div class="preview-main">
+            <div class="preview-section-title">Connected with</div>
+            <div class="preview-peer">
+              <div class="pavatar"></div>
+              <div>
+                <div class="name">tokyo</div>
+                <div class="sub">online · connected</div>
+              </div>
+            </div>
+            <div class="preview-drop">
+              <div class="top">Drop a file anywhere on the window</div>
+              <div>to send to tokyo</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section id="features">
+        <div class="section-label">Features</div>
+        <h2>One job, done quietly.</h2>
+        <div class="features">
+          <div class="feature">
+            <div class="tag">End-to-end encrypted</div>
+            <h3>Only the two of you</h3>
+            <p>QUIC + TLS 1.3 keyed by per-install ed25519 identities. Relays carry ciphertext only.</p>
+          </div>
+          <div class="feature">
+            <div class="tag">Iroh QUIC</div>
+            <h3>Direct when it can, relayed when it can't</h3>
+            <p>NAT hole-punching by default. Falls back to n0's public relays — no infrastructure to run.</p>
+          </div>
+          <div class="feature">
+            <div class="tag">Pair once</div>
+            <h3>Share a code, then forget about it</h3>
+            <p>Paste a friend's code the first time. After that, click their contact tile and drop a file.</p>
+          </div>
+          <div class="feature">
+            <div class="tag">Per-file accept</div>
+            <h3>Nothing arrives unwelcomed</h3>
+            <p>The receiver sees an Accept / Decline prompt for every offer with the filename and size.</p>
+          </div>
+          <div class="feature">
+            <div class="tag">Live presence</div>
+            <h3>Green dot, simple state</h3>
+            <p>Contacts show online / offline via a quiet background ping. Click to dial.</p>
+          </div>
+          <div class="feature">
+            <div class="tag">Tauri · Rust</div>
+            <h3>Native Linux</h3>
+            <p>Small binary, AppImage and .deb, in-app updater. No Electron, no daemon.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="principles">
+        <div class="section-label">Principles</div>
+        <h2>What this isn't.</h2>
+        <div class="principles">
+          <div class="principle">
+            <strong>No store-and-forward.</strong>
+            <span>If the receiver isn't online, the sender waits. We never hold anyone's files.</span>
+          </div>
+          <div class="principle">
+            <strong>No accounts.</strong>
+            <span>Your identity is a keypair on your disk. Lose it, lose the link.</span>
+          </div>
+          <div class="principle">
+            <strong>No krill servers.</strong>
+            <span>n0's public iroh relays do the introductions. We operate nothing.</span>
+          </div>
+          <div class="principle">
+            <strong>No telemetry.</strong>
+            <span>The app makes one network call you didn't initiate: the in-app updater check.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="install">
+        <div class="section-label">Install</div>
+        <h2>Two files. One minute.</h2>
+        <div class="install">
+          <div class="install-copy">
+            <p>
+              Both formats ship the same binary. The
+              <span style="font-family: var(--mono); color: var(--ink)">Copy</span>
+              button in the Files view also needs
+              <span style="font-family: var(--mono); color: var(--ink)">wl-clipboard</span>
+              (Wayland) or
+              <span style="font-family: var(--mono); color: var(--ink)">xclip</span>
+              (X11) — almost everyone has one already.
+            </p>
+            <p style="margin-top: 20px">
+              Or build from source:
+              <span style="font-family: var(--mono); color: var(--ink)">pnpm install &amp;&amp; pnpm tauri build</span>.
+            </p>
+          </div>
+          <div class="install-box">
+            <h3>AppImage · any Linux</h3>
+<pre><span class="c"># download</span>
+curl -LO https://github.com/krill-software/file-drop/releases/download/v0.1.0/File%20Drop_0.1.0_amd64.AppImage
+
+<span class="c"># make executable &amp; run</span>
+chmod +x "File Drop_0.1.0_amd64.AppImage"
+./"File Drop_0.1.0_amd64.AppImage"</pre>
+
+            <hr />
+
+            <h3>Debian / Ubuntu</h3>
+<pre>sudo dpkg -i "File Drop_0.1.0_amd64.deb"
+krill-file-drop</pre>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <div>© krill · MIT licensed · No tracking, no accounts</div>
+        <div>
+          <a href="https://github.com/krill-software/file-drop">Source on GitHub</a>
+          &nbsp;·&nbsp;
+          <a href="https://github.com/krill-software/file-drop/issues">Report an issue</a>
+        </div>
+      </footer>
+    </div>
   </body>
 </html>
