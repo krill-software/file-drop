@@ -44,7 +44,7 @@
       "icons/128x128@2x.png",
       "icons/icon.png"
     ],
-    "category": "Network",
+    "category": "Utility",
     "shortDescription": "Drop a file to a friend",
     "longDescription": "Pair with a friend once via ticket or QR; after that, click their card to drop a file. End-to-end encrypted, peer-to-peer, no accounts.",
     "linux": {
