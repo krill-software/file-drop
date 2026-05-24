@@ -1,9 +1,10 @@
 import "@krill-software/desktop-ui/styles";
 import "./styles.css";
-import { mountChrome, showBootError } from "@krill-software/desktop-ui";
+import { mountChrome, showBootError, checkForUpdates } from "@krill-software/desktop-ui";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { icons as lucideIcons, createElement as createLucide } from "lucide";
 
 // ---- Types (mirror Rust) -------------------------------------------
@@ -172,6 +173,7 @@ function buildAvatar(card: { icon: string; avatar?: string }, size = 48): HTMLEl
 // ---- App state ------------------------------------------------------
 
 let viewportEl: HTMLElement;
+let mainContentEl: HTMLElement; // children swapped per view; topbar stays
 let auxEl: HTMLElement;
 let identity: Identity | null = null;
 let myTicket: string | null = null;
@@ -252,7 +254,7 @@ function renderProfileView() {
   installEditableName(nameWrap);
   root.append(nameWrap);
 
-  viewportEl.replaceChildren(root);
+  mainContentEl.replaceChildren(root);
   // Spin iroh up in the background so the code is ready in Connect.
   void ensureNetworkSilent();
 }
@@ -299,19 +301,22 @@ function installEditableName(wrap: HTMLElement) {
 function renderAux() {
   auxEl.replaceChildren();
 
-  // My profile card (top) — mirrors the profile page: centered avatar + name.
-  const youCard = el("button", {
-    class: "aux-profile-card",
+  // Hamburger sits at the very top of the sidebar.
+  auxEl.append(buildAuxTopbar());
+
+  // My profile (row: avatar + name).
+  const youRow = el("button", {
+    class: "aux-nav profile-row",
     type: "button",
     title: "Your profile",
   });
-  if (activeView.kind === "profile") youCard.setAttribute("data-selected", "true");
+  if (activeView.kind === "profile") youRow.setAttribute("data-selected", "true");
   if (identity) {
-    youCard.append(buildAvatar(identity, 72));
-    youCard.append(el("div", { class: "aux-profile-name" }, identity.displayName));
+    youRow.append(buildAvatar(identity, 28));
+    youRow.append(el("div", { class: "aux-nav-name" }, identity.displayName));
   }
-  youCard.addEventListener("click", () => renderProfileView());
-  auxEl.append(youCard);
+  youRow.addEventListener("click", () => renderProfileView());
+  auxEl.append(youRow);
 
   // Connect row
   const connectRow = el("button", { class: "aux-nav", type: "button", title: "Connect with someone" });
@@ -364,6 +369,9 @@ function renderAux() {
   const list = el("div", { class: "aux-list" });
   auxEl.append(list);
   repaintContactList(sorted);
+
+  // Version footer pinned to the bottom of the sidebar.
+  auxEl.append(el("div", { class: "aux-version" }, `v${__APP_VERSION__}`));
 }
 
 function repaintContactList(sorted: Contact[]) {
@@ -429,7 +437,7 @@ function renderFilesView() {
   void refreshFilesList();
 
   root.append(filesSection);
-  viewportEl.replaceChildren(root);
+  mainContentEl.replaceChildren(root);
 
   if (!myTicket) void ensureNetworkSilent();
 }
@@ -515,7 +523,7 @@ function renderConnectView() {
   howto.append(list);
 
   root.append(yours, connect, howto);
-  viewportEl.replaceChildren(root);
+  mainContentEl.replaceChildren(root);
 
   if (!myTicket) {
     void (async () => {
@@ -693,7 +701,7 @@ function renderSessionView(peer: Identity, opts: { live: boolean }) {
   history.append(historyList);
 
   root.append(header, drop, offers, status, history);
-  viewportEl.replaceChildren(root);
+  mainContentEl.replaceChildren(root);
 
   sessionStatusEl = status;
   sessionOffersEl = offers;
@@ -881,19 +889,102 @@ async function installFileDrop() {
   });
 }
 
+// ---- Main topbar (window controls + hamburger) ----------------------
+
+function buildMainTopbar(): HTMLElement {
+  const bar = el("div", { class: "main-topbar", "data-tauri-drag-region": "true" });
+
+  const min = el("button", { class: "main-topbar-btn", type: "button", title: "Minimize" });
+  min.append(iconSvg("minus", 16));
+  min.addEventListener("click", () => { void getCurrentWindow().minimize(); });
+
+  const max = el("button", { class: "main-topbar-btn", type: "button", title: "Maximize" });
+  max.append(iconSvg("square", 14));
+  max.addEventListener("click", () => { void getCurrentWindow().toggleMaximize(); });
+
+  const close = el("button", {
+    class: "main-topbar-btn",
+    type: "button",
+    title: "Close",
+    "data-kind": "close",
+  });
+  close.append(iconSvg("x", 16));
+  close.addEventListener("click", () => { void getCurrentWindow().close(); });
+
+  bar.append(min, max, close);
+  return bar;
+}
+
+function buildAuxTopbar(): HTMLElement {
+  const bar = el("div", { class: "aux-topbar", "data-tauri-drag-region": "true" });
+  const hamburger = el("button", {
+    class: "main-topbar-btn",
+    type: "button",
+    title: "Menu",
+  });
+  hamburger.append(iconSvg("menu", 16));
+  hamburger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleHamburgerMenu(bar);
+  });
+  bar.append(hamburger);
+  return bar;
+}
+
+function toggleHamburgerMenu(anchor: HTMLElement) {
+  const existing = document.querySelector(".menu-popover");
+  if (existing) { existing.remove(); return; }
+
+  const pop = el("div", { class: "menu-popover" });
+  const items: Array<{ label: string; action: () => void } | { sep: true }> = [
+    { label: "Check for updates…", action: () => void checkForUpdates("File Drop") },
+    { sep: true },
+    { label: "Quit", action: () => void getCurrentWindow().close() },
+  ];
+  for (const it of items) {
+    if ("sep" in it) {
+      pop.append(el("div", { class: "menu-popover-sep" }));
+    } else {
+      const btn = el("button", { class: "menu-popover-item", type: "button" }, it.label);
+      btn.addEventListener("click", () => { pop.remove(); it.action(); });
+      pop.append(btn);
+    }
+  }
+  // Position relative to viewport — anchor is the topbar.
+  anchor.parentElement?.append(pop);
+  // Dismiss on outside click.
+  setTimeout(() => {
+    const handler = (ev: MouseEvent) => {
+      if (!pop.contains(ev.target as Node)) {
+        pop.remove();
+        document.removeEventListener("click", handler);
+      }
+    };
+    document.addEventListener("click", handler);
+  }, 0);
+}
+
 // ---- Boot -----------------------------------------------------------
 
 async function boot() {
   const chrome = mountChrome({
     productName: "File Drop",
     actions: {},
-    showStatusLine: true,
+    showStatusLine: false,
     showAuxPane: true,
     updater: true,
   });
   viewportEl = chrome.viewport;
   auxEl = chrome.aux!;
   auxEl.classList.add("contacts-aux");
+
+  // Shell-app layout: the main pane gets its own topbar (drag region +
+  // hamburger + window controls), and a separate scrollable content area
+  // that each renderXView swaps. The desktop-ui titlebar + status line
+  // are hidden via styles.css for this app.
+  const topbar = buildMainTopbar();
+  mainContentEl = el("div", { class: "main-content" });
+  viewportEl.replaceChildren(topbar, mainContentEl);
 
   identity = await invoke<Identity | null>("load_identity");
 

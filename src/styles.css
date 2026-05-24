@@ -4,6 +4,120 @@
  * pair section) live here. Strict palette: only the five locked colors
  * plus Space-Cadet-alpha tokens. */
 
+/* === Shell-app chrome ============================================== */
+/* file-drop adopts the "shell" layout: no titlebar, no status line.
+ * Window controls + hamburger live in a top strip inside #viewport.
+ * Sidebar is subtly tinted, no border between panes, version label
+ * lives at the bottom of the sidebar. */
+
+#titlebar, #status-line { display: none; }
+
+/* Subtle sidebar tint — main stays pure Ghost White. */
+.contacts-aux {
+  background: rgba(48, 52, 63, 0.03) !important;
+  border-right: 0 !important;
+}
+
+/* Top strip in the main pane: drag region + actions on the right. */
+.main-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 32px;
+  padding: 0 6px;
+  flex-shrink: 0;
+  background: var(--fm-bg);
+}
+
+.main-topbar-btn {
+  width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--fm-muted);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 100ms ease, color 100ms ease;
+}
+.main-topbar-btn:hover { background: var(--fm-rule); color: var(--fm-ink); }
+.main-topbar-btn[data-kind="close"]:hover { background: var(--fm-accent); color: var(--fm-bg); }
+
+/* Sidebar topbar: hosts the hamburger (left) + drag region. */
+.aux-topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+
+/* The hamburger dropdown — anchored left now that the hamburger lives
+ * in the sidebar. */
+.menu-popover {
+  position: absolute;
+  top: 36px;
+  left: 6px;
+  min-width: 180px;
+  background: var(--fm-bg);
+  border: 1px solid var(--fm-rule-strong);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(48, 52, 63, 0.16);
+  padding: 4px 0;
+  z-index: 1000;
+}
+.menu-popover-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--fm-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.menu-popover-item:hover { background: var(--fm-rule); }
+.menu-popover-sep {
+  height: 1px;
+  background: var(--fm-rule);
+  margin: 4px 0;
+}
+
+/* viewport hosts the topbar + scrollable content stacked vertically. */
+#viewport {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.main-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Sidebar gets a flex column so the version footer pins to the bottom. */
+.contacts-aux {
+  display: flex;
+  flex-direction: column;
+}
+.aux-version {
+  padding: 8px 12px 10px;
+  font-size: 11px;
+  color: var(--fm-muted);
+  text-align: center;
+  font-feature-settings: "tnum" 1;
+  margin-top: auto;
+}
+
 :root {
   --fm-selection: rgba(221, 117, 150, 0.22);
 }
@@ -542,6 +656,18 @@ html, body {
 }
 .aux-nav-name { font-size: 13px; font-weight: 600; }
 .aux-nav-sub  { font-size: 10.5px; color: var(--fm-muted); }
+
+/* Profile row: avatar + name, no sub-text. */
+.aux-nav.profile-row .card-visual {
+  background: var(--fm-bg);
+  border: 1px solid var(--fm-rule-strong);
+  color: var(--fm-muted);
+  flex-shrink: 0;
+}
+.aux-nav.profile-row:hover .card-visual {
+  border-color: var(--fm-accent);
+  color: var(--fm-accent);
+}
 
 /* Filter input — sits above the contact list. */
 .aux-filter {

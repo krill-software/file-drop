@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>File Drop — krill-software</title>
+    <style>
+      :root {
+        --fm-bg: #FAFAFF;
+        --fm-text: #30343F;
+        --fm-muted: #878472;
+        --fm-accent: #DD7596;
+        --fm-rule: rgba(48, 52, 63, 0.08);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: var(--fm-bg);
+        color: var(--fm-text);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 16px;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 32px;
+      }
+      main { max-width: 560px; }
+      h1 { font-size: 28px; font-weight: 600; margin: 0 0 8px; }
+      .tagline { color: var(--fm-muted); margin: 0 0 32px; }
+      .tagline a { border: 0; padding: 0; text-decoration: underline; text-underline-offset: 2px; color: inherit; }
+      .links { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+      .links a {
+        display: inline-block;
+        padding: 10px 18px;
+        border: 1px solid var(--fm-rule);
+        border-radius: 8px;
+        text-decoration: none;
+        color: var(--fm-text);
+        font-size: 14px;
+      }
+      .links a:hover { border-color: var(--fm-accent); color: var(--fm-accent); }
+      footer { margin-top: 40px; color: var(--fm-muted); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>File Drop</h1>
+      <p class="tagline">Pair with a friend via a shared code, then drop a file. End-to-end encrypted, P2P, no accounts. Part of <a href="https://github.com/krill-software">krill-software</a>.</p>
+      <div class="links">
+        <a href="https://github.com/krill-software/file-drop">Source on GitHub</a>
+        <a href="https://github.com/krill-software/file-drop/releases">Releases</a>
+        <a href="https://github.com/krill-software/file-drop/blob/main/README.md">README</a>
+      </div>
+      <footer>MIT licensed · No tracking, no accounts</footer>
+    </main>
+  </body>
+</html>
