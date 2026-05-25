@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { icons as lucideIcons, createElement as createLucide } from "lucide";
 
 // ---- Types (mirror Rust) -------------------------------------------
@@ -185,7 +186,7 @@ let activeView:
   | { kind: "files" }
   | { kind: "connect" }
   | { kind: "session"; peerId: string }
-  | { kind: "profile" }
+  | { kind: "settings" }
   = { kind: "files" };
 
 let contactFilter = "";
@@ -201,15 +202,24 @@ async function saveIdentity() {
   renderAux();
 }
 
-function renderProfileView() {
-  activeView = { kind: "profile" };
+interface SettingsView {
+  settings: { downloadFolder?: string };
+  effectiveFolder: string;
+  defaultFolder: string;
+}
+
+function renderSettingsView() {
+  activeView = { kind: "settings" };
   filesListEl = null;
   if (!identity) return;
   renderAux();
 
-  const root = el("div", { class: "main profile" });
+  const root = el("div", { class: "main settings" });
 
-  // Avatar — click to upload.
+  // --- Profile section ---
+  const profileSection = el("section", { class: "settings-section" });
+  profileSection.append(el("h2", { class: "section-title" }, "Profile"));
+
   const avatarBlock = el("div", { class: "profile-avatar-block" });
   const avatarBtn = el("button", {
     class: "profile-avatar",
@@ -245,14 +255,79 @@ function renderProfileView() {
     paint();
     await saveIdentity();
   });
-
   avatarBlock.append(avatarBtn, fileInput, removeAvatar);
-  root.append(avatarBlock);
+  profileSection.append(avatarBlock);
 
-  // Name — click to edit inline.
   const nameWrap = el("div", { class: "profile-name-wrap" });
   installEditableName(nameWrap);
-  root.append(nameWrap);
+  profileSection.append(nameWrap);
+  root.append(profileSection);
+
+  // --- Downloads section ---
+  const downloadsSection = el("section", { class: "settings-section downloads-section" });
+  downloadsSection.append(el("h2", { class: "section-title" }, "Download folder"));
+  downloadsSection.append(el("p", { class: "hint" },
+    "Where incoming files land. Files are saved straight here — no extra subfolder."));
+
+  const folderRow = el("div", { class: "folder-row" });
+  const folderPath = el("code", { class: "folder-path" }, "loading…");
+  const folderActions = el("div", { class: "folder-actions" });
+  const chooseBtn = el("button", { class: "pair-btn", type: "button" }, "Choose…") as HTMLButtonElement;
+  const resetBtn = el("button", { class: "pair-btn", type: "button" }, "Reset to default") as HTMLButtonElement;
+  folderActions.append(chooseBtn, resetBtn);
+  folderRow.append(folderPath, folderActions);
+  downloadsSection.append(folderRow);
+  const folderHint = el("p", { class: "folder-hint hint" }, "");
+  downloadsSection.append(folderHint);
+
+  let current: SettingsView | null = null;
+  const repaintFolder = () => {
+    if (!current) return;
+    folderPath.textContent = current.effectiveFolder;
+    const usingDefault = !current.settings.downloadFolder
+      || current.settings.downloadFolder === current.defaultFolder;
+    resetBtn.disabled = usingDefault;
+    folderHint.textContent = usingDefault
+      ? `Using your default Downloads folder.`
+      : `Override active. Default would be ${current.defaultFolder}.`;
+  };
+
+  void (async () => {
+    try {
+      current = await invoke<SettingsView>("load_settings");
+      repaintFolder();
+    } catch (e) { console.warn("load_settings failed:", e); }
+  })();
+
+  chooseBtn.addEventListener("click", async () => {
+    try {
+      const picked = await openDialog({
+        directory: true,
+        multiple: false,
+        defaultPath: current?.effectiveFolder,
+      });
+      if (typeof picked !== "string" || !picked) return;
+      const next: SettingsView = await invoke("save_settings", {
+        settings: { downloadFolder: picked },
+      });
+      current = next;
+      repaintFolder();
+      void refreshFilesList();
+    } catch (e) { console.warn("choose folder failed:", e); }
+  });
+
+  resetBtn.addEventListener("click", async () => {
+    try {
+      const next: SettingsView = await invoke("save_settings", {
+        settings: {},
+      });
+      current = next;
+      repaintFolder();
+      void refreshFilesList();
+    } catch (e) { console.warn("reset folder failed:", e); }
+  });
+
+  root.append(downloadsSection);
 
   mainContentEl.replaceChildren(root);
   // Spin iroh up in the background so the code is ready in Connect.
@@ -304,19 +379,22 @@ function renderAux() {
   // Hamburger sits at the very top of the sidebar.
   auxEl.append(buildAuxTopbar());
 
-  // My profile (row: avatar + name).
-  const youRow = el("button", {
-    class: "aux-nav profile-row",
+  // Settings nav row (top) — gear icon + label, matches Connect / Files.
+  const settingsRow = el("button", {
+    class: "aux-nav",
     type: "button",
-    title: "Your profile",
+    title: "Settings",
   });
-  if (activeView.kind === "profile") youRow.setAttribute("data-selected", "true");
-  if (identity) {
-    youRow.append(buildAvatar(identity, 28));
-    youRow.append(el("div", { class: "aux-nav-name" }, identity.displayName));
-  }
-  youRow.addEventListener("click", () => renderProfileView());
-  auxEl.append(youRow);
+  if (activeView.kind === "settings") settingsRow.setAttribute("data-selected", "true");
+  const settingsIcon = el("div", { class: "aux-nav-icon" });
+  settingsIcon.append(iconSvg("settings", 18));
+  settingsRow.append(settingsIcon);
+  const settingsText = el("div", { class: "aux-nav-text" });
+  settingsText.append(el("div", { class: "aux-nav-name" }, "Settings"));
+  settingsText.append(el("div", { class: "aux-nav-sub" }, "you and your folders"));
+  settingsRow.append(settingsText);
+  settingsRow.addEventListener("click", () => renderSettingsView());
+  auxEl.append(settingsRow);
 
   // Connect row
   const connectRow = el("button", { class: "aux-nav", type: "button", title: "Connect with someone" });
@@ -1034,9 +1112,50 @@ async function boot() {
   });
 
   contacts = await invoke<Contact[]>("list_contacts").catch(() => []);
+  await hydrateHistories();
   renderAux();
   await installFileDrop();
   renderFilesView();
+}
+
+interface BackendTransfer {
+  id: string;
+  direction: "received" | "sent";
+  peerId: string;
+  peerName: string;
+  name: string;
+  size: number;
+  at: number;
+  path?: string;
+  status: "ok" | "partial" | "rejected";
+}
+
+async function hydrateHistories() {
+  try {
+    const all = await invoke<BackendTransfer[]>("list_history");
+    histories.clear();
+    // Backend stores oldest-first; the per-peer Map wants newest-first
+    // so iterate in reverse and unshift each into its peer's array.
+    for (const t of all) {
+      const arr = histories.get(t.peerId) ?? [];
+      arr.push({
+        direction: t.direction,
+        name: t.name,
+        size: t.size,
+        at: t.at,
+        path: t.path,
+        status: t.status,
+      });
+      histories.set(t.peerId, arr);
+    }
+    // Now reverse each peer's array so newest is first.
+    for (const [k, arr] of histories) {
+      arr.reverse();
+      histories.set(k, arr);
+    }
+  } catch (e) {
+    console.warn("hydrateHistories failed:", e);
+  }
 }
 
 function toIdentity(c: Contact): Identity {

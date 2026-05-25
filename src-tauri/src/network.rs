@@ -68,6 +68,35 @@ struct ContactsFile {
     contacts: Vec<Contact>,
 }
 
+/// One row in the per-app transfer log (received + sent). Persisted to
+/// `history.json` so the Files view + per-peer history survive restart.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Transfer {
+    pub id: String,
+    pub direction: String, // "received" | "sent"
+    #[serde(rename = "peerId")]
+    pub peer_id: String,
+    #[serde(rename = "peerName")]
+    pub peer_name: String,
+    pub name: String,
+    pub size: u64,
+    pub at: u64, // unix millis
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    pub status: String, // "ok" | "partial" | "rejected"
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct HistoryFile {
+    #[serde(default = "default_history_version")]
+    version: u32,
+    transfers: Vec<Transfer>,
+}
+
+fn default_history_version() -> u32 { 1 }
+
+const HISTORY_CAP: usize = 1000;
+
 #[derive(Serialize, Deserialize, Debug)]
 struct Offer {
     name: String,
@@ -89,12 +118,14 @@ pub struct Network {
     pending: Arc<Mutex<HashMap<u64, oneshot::Sender<bool>>>>,
     next_offer_id: Arc<AtomicU64>,
     contacts: Arc<Mutex<Vec<Contact>>>,
+    transfers: Arc<Mutex<Vec<Transfer>>>,
 }
 
 #[derive(Clone)]
 struct Session {
     conn: Connection,
     peer_id: String,
+    peer_name: String,
 }
 
 impl Network {
@@ -108,6 +139,7 @@ impl Network {
 
         card.node_id = endpoint.id().to_string();
         let contacts = load_contacts();
+        let transfers = load_history();
         let me = Self {
             endpoint: endpoint.clone(),
             our_card: Arc::new(Mutex::new(card)),
@@ -115,6 +147,7 @@ impl Network {
             pending: Arc::new(Mutex::new(HashMap::new())),
             next_offer_id: Arc::new(AtomicU64::new(1)),
             contacts: Arc::new(Mutex::new(contacts)),
+            transfers: Arc::new(Mutex::new(transfers)),
         };
 
         // Accept loop.
@@ -229,6 +262,7 @@ impl Network {
         write_framed(&mut send, &serde_json::to_vec(&offer)?).await?;
 
         let peer_id = session.peer_id.clone();
+        let peer_name = session.peer_name.clone();
         emit(&app, "send-status", &serde_json::json!({
             "phase": "waiting", "name": name, "size": size, "peerId": peer_id,
         }));
@@ -240,6 +274,17 @@ impl Network {
             emit(&app, "send-status", &serde_json::json!({
                 "phase": "rejected", "name": name, "peerId": peer_id,
             }));
+            self.append_transfer(Transfer {
+                id: new_transfer_id(),
+                direction: "sent".into(),
+                peer_id: peer_id.clone(),
+                peer_name: peer_name.clone(),
+                name: name.clone(),
+                size,
+                at: now_ms(),
+                path: None,
+                status: "rejected".into(),
+            }, &app).await;
             return Ok(());
         }
 
@@ -271,6 +316,17 @@ impl Network {
         emit(&app, "send-status", &serde_json::json!({
             "phase": "done", "name": name, "size": size, "peerId": peer_id,
         }));
+        self.append_transfer(Transfer {
+            id: new_transfer_id(),
+            direction: "sent".into(),
+            peer_id: peer_id.clone(),
+            peer_name: peer_name.clone(),
+            name: name.clone(),
+            size,
+            at: now_ms(),
+            path: Some(path.display().to_string()),
+            status: "ok".into(),
+        }, &app).await;
         Ok(())
     }
 
@@ -348,6 +404,7 @@ impl Network {
         *self.session.lock().await = Some(Session {
             conn: conn.clone(),
             peer_id: peer.node_id.clone(),
+            peer_name: peer.display_name.clone(),
         });
         emit(&app, "session-started", &peer);
 
@@ -403,7 +460,7 @@ impl Network {
             return Ok(());
         }
 
-        let dir = downloads_dir();
+        let dir = effective_download_folder();
         tokio::fs::create_dir_all(&dir).await.ok();
         let path = unique_path(&dir, &offer.name);
         let display_name = path.file_name()
@@ -439,6 +496,58 @@ impl Network {
             "size": offer.size, "got": got,
             "path": path.display().to_string(), "peerId": peer_id,
         }));
+        // Look up the peer's current display name from contacts (it was
+        // upserted on the pair handshake), so the history row carries a
+        // human name not just a NodeID.
+        let peer_name = self.contacts.lock().await
+            .iter()
+            .find(|c| c.node_id == peer_id)
+            .map(|c| c.display_name.clone())
+            .unwrap_or_default();
+        self.append_transfer(Transfer {
+            id: new_transfer_id(),
+            direction: "received".into(),
+            peer_id: peer_id.clone(),
+            peer_name,
+            name: display_name,
+            size: offer.size,
+            at: now_ms(),
+            path: Some(path.display().to_string()),
+            status: phase.into(),
+        }, &app).await;
+        Ok(())
+    }
+
+    async fn append_transfer(&self, t: Transfer, _app: &AppHandle) {
+        let mut g = self.transfers.lock().await;
+        g.push(t);
+        // Keep the on-disk + in-memory log bounded.
+        if g.len() > HISTORY_CAP {
+            let drop_n = g.len() - HISTORY_CAP;
+            g.drain(0..drop_n);
+        }
+        let snapshot = g.clone();
+        drop(g);
+        if let Err(e) = save_history(&snapshot) {
+            eprintln!("[file-drop] saving history failed: {e:?}");
+        }
+        // The existing recv-status / send-status events already drive UI
+        // updates per-transfer; no separate history-updated event needed
+        // for live use. list_history is for boot hydration only.
+    }
+
+    pub async fn list_history(&self) -> Vec<Transfer> {
+        self.transfers.lock().await.clone()
+    }
+
+    pub async fn list_received_files(&self) -> Vec<ReceivedFile> {
+        let g = self.transfers.lock().await;
+        list_received_files_from(&g)
+    }
+
+    pub async fn clear_history(&self) -> Result<()> {
+        self.transfers.lock().await.clear();
+        save_history(&[])?;
         Ok(())
     }
 
@@ -521,12 +630,26 @@ fn parse_public_key(s: &str) -> Result<PublicKey> {
 
 // ---- Filesystem ---------------------------------------------------------
 
-fn downloads_dir() -> PathBuf {
-    let base = std::env::var_os("XDG_DOWNLOAD_DIR")
+/// Where files land by default — the OS Downloads folder, no subfolder.
+/// Earlier versions auto-created `krill-file-drop/` inside Downloads; user
+/// feedback pushed back, so v0.2+ writes straight into Downloads (or a
+/// user-configured folder via Settings).
+pub fn default_download_folder() -> PathBuf {
+    std::env::var_os("XDG_DOWNLOAD_DIR")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Downloads")))
-        .unwrap_or_else(|| PathBuf::from("."));
-    base.join("krill-file-drop")
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+/// Resolve the folder to write incoming files into. Honors the user's
+/// configured override; falls back to the default Downloads folder.
+pub fn effective_download_folder() -> PathBuf {
+    let s = load_settings();
+    s.download_folder
+        .as_ref()
+        .filter(|p| !p.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(default_download_folder)
 }
 
 fn unique_path(dir: &Path, name: &str) -> PathBuf {
@@ -572,6 +695,44 @@ fn load_contacts() -> Vec<Contact> {
             Vec::new()
         }
     }
+}
+
+fn history_path() -> PathBuf {
+    state_dir().join("history.json")
+}
+
+fn load_history() -> Vec<Transfer> {
+    let path = history_path();
+    let Ok(bytes) = std::fs::read(&path) else { return Vec::new() };
+    match serde_json::from_slice::<HistoryFile>(&bytes) {
+        Ok(f) => f.transfers,
+        Err(e) => {
+            eprintln!("[file-drop] history.json malformed: {e:?}");
+            Vec::new()
+        }
+    }
+}
+
+fn save_history(list: &[Transfer]) -> Result<()> {
+    let dir = state_dir();
+    std::fs::create_dir_all(&dir).with_context(|| format!("mkdir {}", dir.display()))?;
+    let payload = HistoryFile { version: default_history_version(), transfers: list.to_vec() };
+    let bytes = serde_json::to_vec_pretty(&payload)?;
+    std::fs::write(history_path(), bytes).context("writing history.json")?;
+    Ok(())
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+fn new_transfer_id() -> String {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{}-{n}", now_ms())
 }
 
 fn save_contacts(list: &[Contact]) -> Result<()> {
@@ -633,30 +794,30 @@ pub struct ReceivedFile {
     pub path: String,
 }
 
-pub fn list_received_files() -> Vec<ReceivedFile> {
-    let dir = downloads_dir();
-    let Ok(rd) = std::fs::read_dir(&dir) else { return Vec::new() };
-    let mut out: Vec<ReceivedFile> = rd
-        .filter_map(|e| e.ok())
-        .filter_map(|e| {
-            let path = e.path();
-            let meta = e.metadata().ok()?;
-            if !meta.is_file() { return None; }
-            let modified = meta
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
+/// Files the user actually received via file-drop, sourced from the
+/// transfer log (NOT a directory scan, since the download folder may
+/// be the user's general Downloads and we don't want to list unrelated
+/// files). Entries whose file has since been moved/deleted are skipped.
+pub fn list_received_files_from(transfers: &[Transfer]) -> Vec<ReceivedFile> {
+    let mut out: Vec<ReceivedFile> = transfers
+        .iter()
+        .rev() // newest first
+        .filter(|t| t.direction == "received" && t.status == "ok")
+        .filter_map(|t| {
+            let path_str = t.path.as_ref()?;
+            let p = Path::new(path_str);
+            if !p.exists() { return None; }
             Some(ReceivedFile {
-                name: path.file_name()?.to_string_lossy().to_string(),
-                size: meta.len(),
-                modified,
-                path: path.display().to_string(),
+                name: t.name.clone(),
+                size: t.size,
+                modified: t.at,
+                path: path_str.clone(),
             })
         })
         .collect();
-    out.sort_by(|a, b| b.modified.cmp(&a.modified));
+    // Dedupe by path (most-recent kept; iter is already newest-first).
+    let mut seen = std::collections::HashSet::new();
+    out.retain(|f| seen.insert(f.path.clone()));
     out
 }
 
@@ -724,6 +885,37 @@ fn path_to_file_uri(path: &str) -> String {
         }
     }
     out
+}
+
+// ---- App settings -----------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct Settings {
+    /// User-configured override. None / empty means use the OS Downloads
+    /// folder. No subfolder is auto-created in either case.
+    #[serde(rename = "downloadFolder", default, skip_serializing_if = "Option::is_none")]
+    pub download_folder: Option<String>,
+}
+
+fn settings_path() -> PathBuf {
+    state_dir().join("settings.json")
+}
+
+pub fn load_settings() -> Settings {
+    let path = settings_path();
+    let Ok(bytes) = std::fs::read(&path) else { return Settings::default() };
+    serde_json::from_slice(&bytes).unwrap_or_else(|e| {
+        eprintln!("[file-drop] settings.json malformed: {e:?}");
+        Settings::default()
+    })
+}
+
+pub fn save_settings(s: &Settings) -> Result<()> {
+    let dir = state_dir();
+    std::fs::create_dir_all(&dir).with_context(|| format!("mkdir {}", dir.display()))?;
+    let bytes = serde_json::to_vec_pretty(s)?;
+    std::fs::write(settings_path(), bytes).context("writing settings.json")?;
+    Ok(())
 }
 
 pub fn state_dir() -> PathBuf {

@@ -174,8 +174,25 @@ async fn list_contacts(state: State<'_, Arc<AppNetState>>) -> Result<Vec<network
 }
 
 #[tauri::command]
-fn list_received_files() -> Vec<network::ReceivedFile> {
-    network::list_received_files()
+async fn list_received_files(
+    state: State<'_, Arc<AppNetState>>,
+) -> Result<Vec<network::ReceivedFile>, String> {
+    let net = current_net(&state).await?;
+    Ok(net.list_received_files().await)
+}
+
+#[tauri::command]
+async fn list_history(
+    state: State<'_, Arc<AppNetState>>,
+) -> Result<Vec<network::Transfer>, String> {
+    let net = current_net(&state).await?;
+    Ok(net.list_history().await)
+}
+
+#[tauri::command]
+async fn clear_history(state: State<'_, Arc<AppNetState>>) -> Result<(), String> {
+    let net = current_net(&state).await?;
+    net.clear_history().await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -186,6 +203,33 @@ fn open_file(path: String) -> Result<(), String> {
 #[tauri::command]
 fn copy_file_to_clipboard(path: String) -> Result<(), String> {
     network::copy_file_to_clipboard(&path).map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Serialize)]
+struct SettingsView {
+    settings: network::Settings,
+    #[serde(rename = "effectiveFolder")]
+    effective_folder: String,
+    #[serde(rename = "defaultFolder")]
+    default_folder: String,
+}
+
+#[tauri::command]
+fn load_settings() -> SettingsView {
+    let settings = network::load_settings();
+    let effective = network::effective_download_folder();
+    let default = network::default_download_folder();
+    SettingsView {
+        settings,
+        effective_folder: effective.display().to_string(),
+        default_folder: default.display().to_string(),
+    }
+}
+
+#[tauri::command]
+fn save_settings(settings: network::Settings) -> Result<SettingsView, String> {
+    network::save_settings(&settings).map_err(|e| e.to_string())?;
+    Ok(load_settings())
 }
 
 #[tauri::command]
@@ -236,8 +280,12 @@ pub fn run() {
             list_contacts,
             dial_contact,
             list_received_files,
+            list_history,
+            clear_history,
             open_file,
             copy_file_to_clipboard,
+            load_settings,
+            save_settings,
             load_state,
             save_state,
         ])
