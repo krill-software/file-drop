@@ -18,69 +18,55 @@
   border-right: 0 !important;
 }
 
-/* Top strip in the main pane: drag region + traffic-light controls
- * on the right. Matches text-editor's canvas-app titlebar treatment
- * so the two layouts feel like the same family. */
+/* Top strip in the main pane: drag region + icon-button window
+ * controls on the right. Mirrors desktop-ui's #titlebar chrome so
+ * shell apps feel like the same family as canvas apps:
+ *   - 40px tall, 8px symmetric gutter
+ *   - 22px rounded-box icon buttons with rule-alpha hover
+ *   - close button gets a soft-red hover for destructive emphasis */
 .main-topbar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 9px;
+  gap: 2px;
   height: 40px;
-  padding: 0 18px;
+  padding: 0 8px;
   flex-shrink: 0;
   background: var(--fm-bg);
 }
 
-/* Generic class — the hamburger in .aux-topbar also uses this and
- * stays a regular icon button. The traffic-light circle treatment
- * below only applies to the three buttons inside .main-topbar. */
+/* Generic class — used by both the .main-topbar window controls and
+ * the hamburger in .aux-topbar. Same 22×22 rounded-box shape. */
 .main-topbar-btn {
-  width: 28px;
-  height: 24px;
-  display: flex;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
   color: var(--fm-muted);
-  border-radius: 3px;
+  border-radius: 4px;
   cursor: pointer;
   padding: 0;
   transition: background-color 100ms ease, color 100ms ease;
 }
 .main-topbar-btn:hover { background: var(--fm-rule); color: var(--fm-ink); }
-
-/* Traffic-light dots — only the buttons directly inside .main-topbar.
- * Hamburger in .aux-topbar is unaffected. */
-.main-topbar > .main-topbar-btn {
-  width: 13px !important;
-  height: 13px !important;
-  padding: 0 !important;
-  border-radius: 50% !important;
-  border: none !important;
-  transition: filter 100ms ease;
+.main-topbar > .main-topbar-btn[data-kind="close"]:hover {
+  background: #e8a5a5;
+  color: var(--fm-ink);
 }
-.main-topbar > .main-topbar-btn:hover {
-  filter: brightness(0.9);
-  background: inherit !important;
-}
-.main-topbar > .main-topbar-btn svg { display: none; }
-
-/* Per-button colors. Order in the DOM is min, max, close. */
-.main-topbar > .main-topbar-btn:nth-child(1)   { background: #e8cfa5 !important; } /* amber — minimize */
-.main-topbar > .main-topbar-btn:nth-child(2)   { background: #a5d4b2 !important; } /* green — maximize */
-.main-topbar > .main-topbar-btn[data-kind="close"]       { background: #e8a5a5 !important; } /* red — close */
-.main-topbar > .main-topbar-btn[data-kind="close"]:hover { background: #e8a5a5 !important; }
 
 /* Sidebar topbar: hosts the hamburger (left) + drag region. Height
- * matches main-topbar so the chrome rows align across the split. */
+ * matches main-topbar so the chrome rows align across the split.
+ * Same 8px gutter so the hamburger's hover-box edge sits at 8px,
+ * matching the main-topbar's window-button column on the right. */
 .aux-topbar {
   position: relative;
   display: flex;
   align-items: center;
   height: 40px;
-  padding: 0 10px;
+  padding: 0 8px;
   flex-shrink: 0;
 }
 
@@ -89,7 +75,7 @@
 .menu-popover {
   position: absolute;
   top: 44px;
-  left: 10px;
+  left: 8px;
   min-width: 180px;
   background: var(--fm-bg);
   border: 1px solid var(--fm-rule-strong);
