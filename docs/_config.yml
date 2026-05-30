@@ -1,4 +1,4 @@
-remote_theme: krill-software/docs-theme@v3
+remote_theme: krill-software/docs-theme@v3.1
 plugins:
   - jekyll-remote-theme
 
