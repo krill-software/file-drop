@@ -1,6 +1,6 @@
 [package]
 name = "krill-file-drop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Drop a file to a friend over the internet"
 authors = ["Filip"]
 edition = "2021"
