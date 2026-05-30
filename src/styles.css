@@ -26,7 +26,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 9px;
-  height: 44px;
+  height: 40px;
   padding: 0 18px;
   flex-shrink: 0;
   background: var(--fm-bg);
@@ -79,7 +79,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  height: 44px;
+  height: 40px;
   padding: 0 10px;
   flex-shrink: 0;
 }
@@ -88,7 +88,7 @@
  * in the sidebar. */
 .menu-popover {
   position: absolute;
-  top: 48px;
+  top: 44px;
   left: 10px;
   min-width: 180px;
   background: var(--fm-bg);
