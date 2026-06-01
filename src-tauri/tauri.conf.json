@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "File Drop",
-        "width": 900,
-        "height": 720,
-        "minWidth": 560,
-        "minHeight": 480,
+        "width": 1296,
+        "height": 800,
+        "minWidth": 720,
+        "minHeight": 445,
         "decorations": false,
         "resizable": true,
         "center": true,
@@ -37,7 +37,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "appimage"],
+    "targets": [
+      "deb",
+      "appimage"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
