@@ -1,10 +1,9 @@
 import "@krill-software/desktop-ui/styles";
 import "./styles.css";
-import { mountChrome, showBootError, checkForUpdates } from "@krill-software/desktop-ui";
+import { mountChrome, showBootError } from "@krill-software/desktop-ui";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { icons as lucideIcons, createElement as createLucide } from "lucide";
 
@@ -374,10 +373,11 @@ function installEditableName(wrap: HTMLElement) {
 // ---- Aux pane (contacts list) --------------------------------------
 
 function renderAux() {
+  // The aux strip (hamburger) is owned by desktop-ui's app layout — keep it
+  // and re-render only file-drop's own content below it.
+  const strip = auxEl.querySelector(".aux-topbar");
   auxEl.replaceChildren();
-
-  // Hamburger sits at the very top of the sidebar.
-  auxEl.append(buildAuxTopbar());
+  if (strip) auxEl.append(strip);
 
   // Settings nav row (top) — gear icon + label, matches Connect / Files.
   const settingsRow = el("button", {
@@ -447,9 +447,6 @@ function renderAux() {
   const list = el("div", { class: "aux-list" });
   auxEl.append(list);
   repaintContactList(sorted);
-
-  // Version footer pinned to the bottom of the sidebar.
-  auxEl.append(el("div", { class: "aux-version" }, `v${__APP_VERSION__}`));
 }
 
 function repaintContactList(sorted: Contact[]) {
@@ -969,86 +966,13 @@ async function installFileDrop() {
 
 // ---- Main topbar (window controls + hamburger) ----------------------
 
-function buildMainTopbar(): HTMLElement {
-  const bar = el("div", { class: "main-topbar", "data-tauri-drag-region": "true" });
-
-  const min = el("button", { class: "main-topbar-btn", type: "button", title: "Minimize" });
-  min.append(iconSvg("minus", 16));
-  min.addEventListener("click", () => { void getCurrentWindow().minimize(); });
-
-  const max = el("button", { class: "main-topbar-btn", type: "button", title: "Maximize" });
-  max.append(iconSvg("square", 14));
-  max.addEventListener("click", () => { void getCurrentWindow().toggleMaximize(); });
-
-  const close = el("button", {
-    class: "main-topbar-btn",
-    type: "button",
-    title: "Close",
-    "data-kind": "close",
-  });
-  close.append(iconSvg("x", 16));
-  close.addEventListener("click", () => { void getCurrentWindow().close(); });
-
-  bar.append(min, max, close);
-  return bar;
-}
-
-function buildAuxTopbar(): HTMLElement {
-  const bar = el("div", { class: "aux-topbar", "data-tauri-drag-region": "true" });
-  const hamburger = el("button", {
-    class: "main-topbar-btn",
-    type: "button",
-    title: "Menu",
-  });
-  hamburger.append(iconSvg("menu", 16));
-  hamburger.addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggleHamburgerMenu(bar);
-  });
-  bar.append(hamburger);
-  return bar;
-}
-
-function toggleHamburgerMenu(anchor: HTMLElement) {
-  const existing = document.querySelector(".menu-popover");
-  if (existing) { existing.remove(); return; }
-
-  const pop = el("div", { class: "menu-popover" });
-  const items: Array<{ label: string; action: () => void } | { sep: true }> = [
-    { label: "Check for updates…", action: () => void checkForUpdates("File Drop") },
-    { sep: true },
-    { label: "Quit", action: () => void getCurrentWindow().close() },
-  ];
-  for (const it of items) {
-    if ("sep" in it) {
-      pop.append(el("div", { class: "menu-popover-sep" }));
-    } else {
-      const btn = el("button", { class: "menu-popover-item", type: "button" }, it.label);
-      btn.addEventListener("click", () => { pop.remove(); it.action(); });
-      pop.append(btn);
-    }
-  }
-  // Position relative to viewport — anchor is the topbar.
-  anchor.parentElement?.append(pop);
-  // Dismiss on outside click.
-  setTimeout(() => {
-    const handler = (ev: MouseEvent) => {
-      if (!pop.contains(ev.target as Node)) {
-        pop.remove();
-        document.removeEventListener("click", handler);
-      }
-    };
-    document.addEventListener("click", handler);
-  }, 0);
-}
-
 // ---- Boot -----------------------------------------------------------
 
 async function boot() {
   const chrome = mountChrome({
     productName: "File Drop",
-    actions: {},
-    showStatusLine: false,
+    version: __APP_VERSION__,
+    layout: "app",
     showAuxPane: true,
     updater: true,
   });
@@ -1056,13 +980,10 @@ async function boot() {
   auxEl = chrome.aux!;
   auxEl.classList.add("contacts-aux");
 
-  // Shell-app layout: the main pane gets its own topbar (drag region +
-  // hamburger + window controls), and a separate scrollable content area
-  // that each renderXView swaps. The desktop-ui titlebar + status line
-  // are hidden via styles.css for this app.
-  const topbar = buildMainTopbar();
-  mainContentEl = el("div", { class: "main-content" });
-  viewportEl.replaceChildren(topbar, mainContentEl);
+  // App layout: desktop-ui provides the main pane's top strip (window
+  // controls) + the aux hamburger menu. Each renderXView swaps the children
+  // of the scroll area it hands back.
+  mainContentEl = chrome.mainContent!;
 
   identity = await invoke<Identity | null>("load_identity");
 
