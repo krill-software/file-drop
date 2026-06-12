@@ -28,68 +28,96 @@ features:
     blurb: Small binary, AppImage and .deb, in-app updater. No Electron, no daemon.
 extension: ""
 mock:
-  state: 'online · connected'
+  chrome: app
 ---
 <style>
-  .fd-mock {
+  /* App-layout mock: hamburger + nav rows + contacts in the aux column,
+   * a live session (Connected with → drop zone → History) in the main
+   * pane. No titlebar / status line — mock.chrome: app. */
+  .fd-app {
     display: grid;
-    grid-template-columns: 220px 1fr;
-    min-height: 320px;
+    grid-template-columns: 230px 1fr;
+    min-height: 400px;
+    font-family: var(--sans);
   }
   .fd-aux {
-    background: rgba(48, 52, 63, 0.03);
-    padding: 6px 8px 14px;
+    border-right: 1px solid var(--rule);
+    padding: 10px 10px 14px;
     display: flex; flex-direction: column;
     gap: 2px;
-    font-family: var(--sans);
     font-size: 12.5px;
-    border-right: 1px solid var(--rule);
   }
-  .fd-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 8px;
-    border-radius: 4px;
+  .fd-burger { color: var(--muted); font-size: 14px; padding: 2px 6px 10px; }
+  .fd-nav {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
     color: var(--ink);
   }
-  .fd-row.selected { background: rgba(221, 117, 150, 0.10); }
-  .fd-row .pavatar {
-    width: 22px; height: 22px;
+  .fd-nav.on { background: rgba(221, 117, 150, 0.10); }
+  .fd-nav svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+  .fd-nav-name { font-size: 13px; font-weight: 600; }
+  .fd-nav-sub { font-size: 10.5px; color: var(--muted); }
+  .fd-aux-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    padding: 14px 10px 6px;
+  }
+  .fd-filter {
+    display: flex; align-items: center; gap: 6px;
+    margin: 0 2px 6px;
+    padding: 5px 8px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 5px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .fd-filter svg { width: 13px; height: 13px; flex: none; }
+  .fd-tile {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    border-radius: 5px;
+  }
+  .fd-tile.on { background: rgba(221, 117, 150, 0.10); }
+  .fd-avatar {
+    width: 32px; height: 32px;
     border-radius: 50%;
     background: var(--rule);
-    flex-shrink: 0;
-  }
-  .fd-row .picon {
-    width: 22px; height: 22px;
+    color: var(--muted);
     display: flex; align-items: center; justify-content: center;
-    color: var(--muted);
-    flex-shrink: 0;
+    flex: none;
   }
-  .fd-row .pdot {
-    width: 7px; height: 7px;
+  .fd-avatar svg { width: 16px; height: 16px; }
+  .fd-tile.off .fd-avatar { opacity: 0.55; }
+  .fd-tile-text { flex: 1; min-width: 0; }
+  .fd-tile-name { font-size: 13px; font-weight: 500; }
+  .fd-tile.off .fd-tile-name { color: var(--muted); }
+  .fd-tile-meta { font-size: 10.5px; color: var(--muted); }
+  .fd-dot {
+    width: 8px; height: 8px;
     border-radius: 50%;
+    background: var(--rule-strong);
+    flex: none;
+  }
+  .fd-tile.on .fd-dot {
     background: var(--accent);
-    margin-left: auto;
+    box-shadow: 0 0 0 2px rgba(221, 117, 150, 0.18);
   }
-  .fd-row.offline .pdot { background: var(--rule-strong); }
-  .fd-sep {
-    font-family: var(--mono);
-    font-size: 10.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
-    padding: 14px 8px 4px;
-  }
-  .fd-version {
-    margin-top: auto;
-    text-align: center;
-    font-size: 10.5px;
-    color: var(--muted);
-    font-family: var(--mono);
-    padding-top: 8px;
-  }
+
   .fd-main {
-    padding: 18px 24px 24px;
-    display: flex; flex-direction: column; gap: 14px;
+    display: flex; flex-direction: column;
+    gap: 14px;
+    padding: 10px 22px 22px;
+  }
+  .fd-winbtns {
+    align-self: flex-end;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 2px;
   }
   .fd-section-title {
     font-family: var(--mono);
@@ -100,76 +128,119 @@ mock:
   }
   .fd-peer {
     display: flex; align-items: center; gap: 12px;
-    padding: 12px;
+    padding: 13px 14px;
     border: 1px solid var(--rule);
     border-radius: 6px;
   }
-  .fd-peer .pavatar { width: 40px; height: 40px; border-radius: 50%; background: var(--rule); flex-shrink: 0; }
-  .fd-peer .name { font-size: 14px; font-weight: 600; }
-  .fd-peer .sub { font-size: 11px; color: var(--accent-strong); }
+  .fd-peer .fd-avatar { width: 48px; height: 48px; }
+  .fd-peer .fd-avatar svg { width: 24px; height: 24px; }
+  .fd-peer-name { font-size: 16px; font-weight: 600; }
+  .fd-peer-sub { font-size: 11px; color: var(--muted); }
+  .fd-btn {
+    margin-left: auto;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: var(--ink);
+    border: 1px solid var(--rule-strong);
+    border-radius: 5px;
+  }
   .fd-drop {
     border: 2px dashed var(--rule-strong);
     border-radius: 8px;
-    padding: 24px;
-    text-align: center;
+    padding: 26px 20px;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
     color: var(--muted);
-    font-size: 13px;
   }
-  .fd-drop .top {
-    color: var(--ink); font-weight: 600; margin-bottom: 4px;
-  }
+  .fd-drop svg { width: 28px; height: 28px; margin-bottom: 4px; }
+  .fd-drop-text { color: var(--ink); font-size: 14px; font-weight: 600; }
+  .fd-drop-sub { font-size: 12px; }
+  .fd-hint { font-size: 12px; color: var(--muted); }
+
   @media (max-width: 720px) {
-    .fd-mock { grid-template-columns: 160px 1fr; }
+    .fd-app { grid-template-columns: 1fr; }
+    .fd-aux { display: none; }
   }
 </style>
-<div class="fd-mock">
-  <div class="fd-aux">
-    <div class="fd-row">
-      <div class="pavatar"></div>
-      <span>swift-otter-42</span>
-    </div>
-    <div class="fd-row">
-      <div class="picon">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+<div class="fd-app">
+  <aside class="fd-aux">
+    <div class="fd-burger">☰</div>
+    <div class="fd-nav">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      <div>
+        <div class="fd-nav-name">Settings</div>
+        <div class="fd-nav-sub">you and your folders</div>
       </div>
-      <span>Connect</span>
     </div>
-    <div class="fd-row">
-      <div class="picon">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+    <div class="fd-nav">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      <div>
+        <div class="fd-nav-name">Connect</div>
+        <div class="fd-nav-sub">pair with a friend</div>
       </div>
-      <span>Files</span>
     </div>
-    <div class="fd-sep">Contacts</div>
-    <div class="fd-row selected">
-      <div class="pavatar"></div>
-      <span>tokyo</span>
-      <span class="pdot"></span>
+    <div class="fd-nav">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      <div>
+        <div class="fd-nav-name">Files</div>
+        <div class="fd-nav-sub">what people sent you</div>
+      </div>
     </div>
-    <div class="fd-row offline">
-      <div class="pavatar"></div>
-      <span>mom</span>
-      <span class="pdot"></span>
+    <div class="fd-aux-header">Contacts</div>
+    <div class="fd-filter">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      Filter contacts
     </div>
-    <div class="fd-row offline">
-      <div class="pavatar"></div>
-      <span>work-laptop</span>
-      <span class="pdot"></span>
+    <div class="fd-tile on">
+      <div class="fd-avatar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="fd-tile-text">
+        <div class="fd-tile-name">tokyo</div>
+        <div class="fd-tile-meta">online</div>
+      </div>
+      <span class="fd-dot"></span>
     </div>
-    <div class="fd-version">v0.1.1</div>
-  </div>
+    <div class="fd-tile off">
+      <div class="fd-avatar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="fd-tile-text">
+        <div class="fd-tile-name">mom</div>
+        <div class="fd-tile-meta">offline</div>
+      </div>
+      <span class="fd-dot"></span>
+    </div>
+    <div class="fd-tile off">
+      <div class="fd-avatar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="fd-tile-text">
+        <div class="fd-tile-name">work-laptop</div>
+        <div class="fd-tile-meta">offline</div>
+      </div>
+      <span class="fd-dot"></span>
+    </div>
+  </aside>
   <div class="fd-main">
+    <div class="fd-winbtns">─ ▢ ✕</div>
     <div class="fd-section-title">Connected with</div>
     <div class="fd-peer">
-      <div class="pavatar"></div>
-      <div>
-        <div class="name">tokyo</div>
-        <div class="sub">online · connected</div>
+      <div class="fd-avatar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </div>
+      <div>
+        <div class="fd-peer-name">tokyo</div>
+        <div class="fd-peer-sub">online · connected</div>
+      </div>
+      <div class="fd-btn">Disconnect</div>
     </div>
     <div class="fd-drop">
-      <div class="top">Drop a file anywhere on the window</div>
-      <div>to send to tokyo</div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+      <div class="fd-drop-text">Drop a file anywhere on the window</div>
+      <div class="fd-drop-sub">to send to tokyo</div>
     </div>
+    <div class="fd-section-title">History</div>
+    <div class="fd-hint">No transfers yet.</div>
   </div>
 </div>
