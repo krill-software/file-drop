@@ -27,7 +27,9 @@ iroh = "0.98"
 anyhow = "1"
 postcard = { version = "1", features = ["alloc"] }
 data-encoding = "2"
-tokio = { version = "1", features = ["sync", "io-util"] }
+tokio = { version = "1", features = ["sync", "io-util", "macros", "rt", "net"] }
+axum = { version = "0.7", features = ["multipart"] }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 
 [profile.release]
 panic = "abort"

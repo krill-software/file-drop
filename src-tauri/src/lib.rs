@@ -1,4 +1,5 @@
 mod network;
+mod upload;
 
 use std::sync::Arc;
 
@@ -37,6 +38,7 @@ impl Identity {
 #[derive(Default)]
 struct AppNetState {
     net: Mutex<Option<network::Network>>,
+    upload_server: Mutex<upload::UploadServer>,
 }
 
 #[tauri::command]
@@ -260,6 +262,60 @@ fn save_state(state: AppState) -> Result<(), String> {
     kstate::save(SLUG, "state.json", &state)
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct UploadInfo {
+    url: String,
+    #[serde(rename = "qrSvg")]
+    qr_svg: String,
+}
+
+impl From<upload::ServerInfo> for UploadInfo {
+    fn from(i: upload::ServerInfo) -> Self {
+        UploadInfo { url: i.url, qr_svg: i.qr_svg }
+    }
+}
+
+/// Fixed port for the phone-upload page, so a firewall rule can name it
+/// (`sudo ufw allow 8765/tcp`). A random port would be unblockable.
+const UPLOAD_PORT: u16 = 8765;
+
+/// Switch on the phone-upload page. Idempotent; needs the network started
+/// so uploads can be logged into the same transfer history as P2P drops.
+#[tauri::command]
+async fn start_upload_server(
+    app: AppHandle,
+    state: State<'_, Arc<AppNetState>>,
+) -> Result<UploadInfo, String> {
+    let net = current_net(&state).await?;
+    let lan_ip = upload::lan_ip().ok_or("no network connection")?;
+    let on_received: upload::OnReceived = Arc::new(move |f: upload::ReceivedUpload| {
+        let net = net.clone();
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            net.record_received(f.name, f.size, f.path, &app).await;
+        });
+    });
+    let mut server = state.upload_server.lock().await;
+    server
+        .start(UPLOAD_PORT, network::effective_download_folder(), lan_ip, on_received)
+        .await
+        .map(Into::into)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn stop_upload_server(state: State<'_, Arc<AppNetState>>) -> Result<(), String> {
+    state.upload_server.lock().await.stop().await;
+    Ok(())
+}
+
+/// Current upload-server state, so the connect view can restore its QR
+/// after the user navigates away and back.
+#[tauri::command]
+async fn upload_server_info(state: State<'_, Arc<AppNetState>>) -> Result<Option<UploadInfo>, String> {
+    Ok(state.upload_server.lock().await.info().map(Into::into))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let net_state = Arc::new(AppNetState::default());
@@ -288,6 +344,9 @@ pub fn run() {
             save_settings,
             load_state,
             save_state,
+            start_upload_server,
+            stop_upload_server,
+            upload_server_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

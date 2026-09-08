@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>File Drop</title>
+  <style>
+    /* Served to the phone's browser. Same locked palette as the app. */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      background: #FAFAFF;
+      color: #30343F;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    main { width: 100%; max-width: 400px; text-align: center; }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+    p { font-size: 14px; color: #878472; margin-bottom: 28px; }
+    label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 40px 20px;
+      border: 1px dashed #DD7596;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #30343F;
+    }
+    label:active { background: rgba(221, 117, 150, 0.08); }
+    label svg { width: 32px; height: 32px; stroke: #DD7596; }
+    .label-text { font-size: 15px; font-weight: 500; }
+    .label-sub { font-size: 12px; color: #878472; }
+    input[type="file"] { display: none; }
+    .status { margin-top: 20px; font-size: 13px; color: #878472; min-height: 18px; }
+    .status.ok { color: #FF82BF; }
+    .status.err { color: #DD7596; }
+    .bar {
+      height: 3px; margin-top: 12px; border-radius: 2px;
+      background: rgba(48, 52, 63, 0.08); overflow: hidden;
+    }
+    .bar > div { height: 100%; width: 0; background: #DD7596; transition: width 120ms linear; }
+    .bar[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>File Drop</h1>
+    <p>Files you pick here land on your desktop.</p>
+    <label>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <span class="label-text">Choose files</span>
+      <span class="label-sub">Photos, videos, anything</span>
+      <input type="file" id="picker" multiple>
+    </label>
+    <div class="bar" id="bar" hidden><div id="fill"></div></div>
+    <div class="status" id="status"></div>
+  </main>
+  <script>
+    const picker = document.getElementById("picker");
+    const status = document.getElementById("status");
+    const bar = document.getElementById("bar");
+    const fill = document.getElementById("fill");
+
+    picker.addEventListener("change", () => {
+      const files = Array.from(picker.files);
+      if (files.length) void send(files);
+    });
+
+    // One request per file so a failure names the file, and progress is
+    // per-file rather than one opaque total.
+    async function send(files) {
+      picker.disabled = true;
+      bar.hidden = false;
+      status.className = "status";
+      let done = 0;
+      try {
+        for (const file of files) {
+          status.textContent = `Sending ${file.name}…`;
+          await upload(file);
+          done++;
+        }
+        status.textContent = done === 1 ? "Sent 1 file" : `Sent ${done} files`;
+        status.className = "status ok";
+      } catch (e) {
+        status.textContent = `Couldn't send: ${e.message || e}`;
+        status.className = "status err";
+      } finally {
+        picker.disabled = false;
+        picker.value = "";
+        bar.hidden = true;
+        fill.style.width = "0";
+      }
+    }
+
+    function upload(file) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/upload");
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) fill.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+        };
+        xhr.onload = () => (xhr.status === 200 ? resolve() : reject(new Error(xhr.responseText || xhr.statusText)));
+        xhr.onerror = () => reject(new Error("network error"));
+        const form = new FormData();
+        form.append("file", file, file.name);
+        xhr.send(form);
+      });
+    }
+  </script>
+</body>
+</html>

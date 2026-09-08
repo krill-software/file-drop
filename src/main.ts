@@ -27,6 +27,8 @@ interface Contact {
 
 interface NetInfo { nodeId: string; ticket: string }
 
+interface UploadInfo { url: string; qrSvg: string }
+
 interface SendStatus {
   phase: "waiting" | "sending" | "done" | "rejected";
   name: string;
@@ -524,9 +526,9 @@ function renderConnectView() {
   if (!identity) return;
   const root = el("div", { class: "main connect-view" });
 
-  // Your code
+  // Your code (P2P)
   const yours = el("section", { class: "your-code" });
-  yours.append(el("h2", { class: "section-title" }, "Your code"));
+  yours.append(el("h2", { class: "section-title" }, "Desktop to Desktop"));
   yours.append(el("p", { class: "hint" },
     "Share this with a friend so they can connect to you."));
   const codeBtn = el("button", {
@@ -584,20 +586,56 @@ function renderConnectView() {
   dialBtn.addEventListener("click", () => void dial());
   pasteInput.addEventListener("keydown", (e) => { if (e.key === "Enter") void dial(); });
 
-  // How-to
-  const howto = el("section", { class: "howto" });
-  howto.append(el("h2", { class: "section-title" }, "How it works"));
-  const list = el("ol", { class: "howto-list" });
-  const steps = [
-    "Tap Copy your code above.",
-    "Send it to the person you want to connect with (Signal, iMessage, email — anywhere).",
-    "Have them paste their code back to you, paste it above, then hit Connect.",
-    "Once paired they'll appear in your Contacts and you can drop files to each other.",
-  ];
-  for (const s of steps) list.append(el("li", {}, s));
-  howto.append(list);
+  // Phone → desktop over the LAN. The server only runs while switched on;
+  // its state lives in Rust so it survives leaving and re-entering this view.
+  const phone = el("section", { class: "phone-upload" });
+  phone.append(el("h2", { class: "section-title" }, "Phone to desktop"));
+  phone.append(el("p", { class: "hint" },
+    "Switch on, then scan the code with your phone's camera. Files you pick there land in your download folder. Same Wi-Fi only — and if this machine runs a firewall, it needs to allow port 8765."));
+  const qrBox = el("div", { class: "qr-box" });
+  const qrEl = el("div", { class: "qr-code" });
+  const qrUrl = el("div", { class: "qr-url mono" });
+  qrBox.append(qrEl, qrUrl);
+  qrBox.hidden = true;
+  const phoneRow = el("div", { class: "phone-row" });
+  const phoneBtn = el("button", { class: "pair-btn primary", type: "button" }, "Switch on") as HTMLButtonElement;
+  const phoneStatus = el("div", { class: "pair-status" });
+  phoneRow.append(phoneBtn, phoneStatus);
+  phone.append(phoneRow, qrBox);
 
-  root.append(yours, connect, howto);
+  let phoneOn = false;
+  const paintPhone = (info: UploadInfo | null) => {
+    phoneOn = info !== null;
+    phoneBtn.textContent = phoneOn ? "Switch off" : "Switch on";
+    phoneBtn.classList.toggle("primary", !phoneOn);
+    qrBox.hidden = !phoneOn;
+    if (info) {
+      qrEl.innerHTML = info.qrSvg;
+      qrUrl.textContent = info.url;
+    }
+  };
+  phoneBtn.addEventListener("click", async () => {
+    phoneBtn.disabled = true;
+    phoneStatus.textContent = "";
+    phoneStatus.dataset.kind = "";
+    try {
+      if (phoneOn) {
+        await invoke("stop_upload_server");
+        paintPhone(null);
+      } else {
+        await ensureNetworkSilent();
+        paintPhone(await invoke<UploadInfo>("start_upload_server"));
+      }
+    } catch (e: any) {
+      phoneStatus.textContent = `Couldn't switch on: ${e}`;
+      phoneStatus.dataset.kind = "err";
+    } finally {
+      phoneBtn.disabled = false;
+    }
+  });
+  void invoke<UploadInfo | null>("upload_server_info").then(paintPhone).catch(() => {});
+
+  root.append(yours, connect, phone);
   mainContentEl.replaceChildren(root);
 
   if (!myTicket) {

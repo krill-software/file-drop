@@ -97,6 +97,9 @@ fn default_history_version() -> u32 { 1 }
 
 const HISTORY_CAP: usize = 1000;
 
+/// Pseudo peer id for files that arrive from the phone-upload page.
+pub const PHONE_PEER_ID: &str = "phone";
+
 #[derive(Serialize, Deserialize, Debug)]
 struct Offer {
     name: String,
@@ -536,6 +539,27 @@ impl Network {
         // for live use. list_history is for boot hydration only.
     }
 
+    /// Log a file that arrived via the phone-upload page as a received
+    /// transfer, so it shows in the Files view like a P2P drop. The phone
+    /// isn't a contact; it's recorded under a fixed pseudo-peer.
+    pub async fn record_received(&self, name: String, size: u64, path: PathBuf, app: &AppHandle) {
+        emit(app, "recv-status", &serde_json::json!({
+            "phase": "done", "offerId": 0, "name": name, "size": size, "got": size,
+            "path": path.display().to_string(), "peerId": PHONE_PEER_ID,
+        }));
+        self.append_transfer(Transfer {
+            id: new_transfer_id(),
+            direction: "received".into(),
+            peer_id: PHONE_PEER_ID.into(),
+            peer_name: "Phone".into(),
+            name,
+            size,
+            at: now_ms(),
+            path: Some(path.display().to_string()),
+            status: "ok".into(),
+        }, app).await;
+    }
+
     pub async fn list_history(&self) -> Vec<Transfer> {
         self.transfers.lock().await.clone()
     }
@@ -652,7 +676,7 @@ pub fn effective_download_folder() -> PathBuf {
         .unwrap_or_else(default_download_folder)
 }
 
-fn unique_path(dir: &Path, name: &str) -> PathBuf {
+pub fn unique_path(dir: &Path, name: &str) -> PathBuf {
     let candidate = dir.join(name);
     if !candidate.exists() { return candidate; }
     let (stem, ext) = split_name(name);

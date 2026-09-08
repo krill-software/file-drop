@@ -174,6 +174,16 @@ No ticket. No code. The whole interaction is one drag.
 - Multiple files per session.
 - Linux x86_64. Tauri 2 + TypeScript + Rust. Same stack as every other krill app.
 
+### Phone to desktop (LAN)
+
+The one non-Iroh path. On the Connect view, **Switch on** starts a tiny HTTP server on port **8765**, bound to all interfaces, and shows a QR code for `http://<lan-ip>:8765/`. The phone scans it with its camera, gets a one-button page ("Choose files"), and each picked file is POSTed as multipart and streamed straight into the download folder — same never-overwrite `(2)` naming as P2P drops, and logged into the same transfer history so it shows up in the Files view.
+
+- **Same Wi-Fi only.** No relay, no NAT traversal, nothing leaves the LAN. That's the point: it's the zero-setup path for the phone in your pocket, not a replacement for pairing.
+- **Off by default, off when you say so.** The server only runs between Switch on and Switch off. While it's on, anyone on the LAN who has the URL can drop files into your download folder — so it's a deliberate switch, not an always-on listener.
+- **Fixed port, because firewalls.** Pop!_OS / Ubuntu ship ufw, and a default ufw denies incoming. A fixed port means one rule fixes it (`sudo ufw allow 8765/tcp`); an OS-assigned port could never be allowed. The app can't open the firewall itself (root), and shouldn't — the hint text says what to do.
+- **No app on the phone.** The page is plain HTML served by the desktop; nothing to install. The phone is not a contact and has no identity.
+- **QR is ink on Ghost White in both themes** — it's content the camera reads, not chrome.
+
 ## What v1 is *not*
 
 - **No store-and-forward.** If the receiver isn't running File Drop right now, the sender waits. We never hold anyone's files.
@@ -181,7 +191,7 @@ No ticket. No code. The whole interaction is one drag.
 - **No file history / inbox / log.** Drops land in `~/Downloads/krill-file-drop/`; that directory *is* the inbox.
 - **No chat, no message attachments.** Files only.
 - **No krill-operated servers.** v1 uses n0's public relays. Self-hosting is a documented future option, not a v1 feature.
-- **No iOS/Android client.** Receiving on a phone is a future question.
+- **No iOS/Android client.** Sending *from* a phone works via the LAN upload page above; receiving *on* a phone is a future question.
 - **No macOS or Windows build.** Deferred, not rejected — see Future.
 - **No accounts, no telemetry, no analytics.** Same as every krill app.
 
