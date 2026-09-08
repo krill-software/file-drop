@@ -8,7 +8,7 @@ Part of the [krill](https://krill.software) umbrella of small, calm, single-purp
 
 ## Status
 
-Pre-v1. Currently at M1: first-run card setup. The networking layer (iroh) is not wired in yet.
+Released. Desktop-to-desktop drops over Iroh (WAN, end-to-end encrypted), saved contacts, transfer history, and a phone-to-desktop upload page over the LAN via QR. See the [releases](https://github.com/krill-software/file-drop/releases).
 
 ## License
 
