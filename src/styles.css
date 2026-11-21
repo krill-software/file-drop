@@ -7,13 +7,7 @@
 /* === App-layout overrides =========================================
  * Chrome (in-viewport top bars, hamburger menu, no titlebar / status line)
  * comes from desktop-ui via mountChrome({ layout: "app" }). Only file-drop's
- * own surfaces live here. Sidebar subtly tinted, version label at its foot. */
-
-/* Subtle sidebar tint — main stays pure Ghost White. */
-.contacts-aux {
-  background: rgba(48, 52, 63, 0.03) !important;
-  border-right: 0 !important;
-}
+ * own surfaces live here. */
 
 .main-content {
   flex: 1;
@@ -551,8 +545,6 @@ body {
   display: flex;
   flex-direction: column;
   padding: 0;
-  background: var(--fm-bg);
-  border-right: 1px solid var(--fm-rule);
 }
 
 .aux-header {
